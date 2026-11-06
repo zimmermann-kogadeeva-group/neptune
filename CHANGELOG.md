@@ -2,6 +2,15 @@
 
 All notable changes to Neptune will be documented in this file.
 
+## Unreleased
+
+### Added
+
+- A persistent k-mer cache (`--kmer-cache DIR`), so per-genome k-mer counts
+  can be reused between executions (e.g. when running each genome against all
+  others as exclusion). Specify `-k` explicitly for the cache to be reused.
+- A `neptune cache` command for pre-computing the k-mer cache.
+
 ## 2.0.1
 
 2026-05-01

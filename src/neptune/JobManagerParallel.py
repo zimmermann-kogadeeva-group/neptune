@@ -265,6 +265,9 @@ class JobManagerParallel(JobManager.JobManager):
         Neptune.aggregateMultipleFiles(...)
 
 
+    [BOOL -- OPTIONAL] [delete]
+        Whether to delete the input k-mer files after aggregation.
+
     RETURN
     ------
 
@@ -275,7 +278,7 @@ class JobManagerParallel(JobManager.JobManager):
     """
     def createAggregateJob(
             self, inclusionLocations, exclusionLocations,
-            outputLocation, tag):
+            outputLocation, tag, delete=True):
 
         parameters = {}
 
@@ -302,7 +305,7 @@ class JobManagerParallel(JobManager.JobManager):
         parameters[AggregateKMers.OUTPUT] = outputLocation
 
         # DELETE
-        parameters[AggregateKMers.DELETE] = True
+        parameters[AggregateKMers.DELETE] = delete
 
         job = self.pool.apply_async(
             submit, args=(AggregateKMers.parse, [parameters], ))

@@ -32,11 +32,13 @@ import time
 
 import os
 import argparse
+import sys
 import shutil
 
 import neptune.Execution as Execution
 import neptune.Utility as Utility
 import neptune.CountKMers as CountKMers
+import neptune.KMerCache as KMerCache
 import neptune.ExtractSignatures as ExtractSignatures
 import neptune.FilterSignatures as FilterSignatures
 
@@ -53,7 +55,13 @@ PROGRAM_DESCRIPTION = "Neptune identifies signatures using an exact k-mer \
     in many inclusion targets and sufficiently absent from exclusion targets."
 
 PROGRAM_USAGE = "%(prog)s -i INCLUSION [INCLUSION ...] -e EXCLUSION \n\t \
-    [EXCLUSION ...] -o OUTPUT"
+    [EXCLUSION ...] -o OUTPUT\n       %(prog)s cache -i INPUT [INPUT ...] -k K " \
+    "--kmer-cache CACHE"
+
+PROGRAM_EPILOG = "Use '%(prog)s cache --help' for pre-computing a k-mer cache \
+    that can be reused between executions with --kmer-cache."
+
+CACHE_COMMAND = "cache"
 
 # FILE NAMES #
 
@@ -136,6 +144,9 @@ RETURN
 """
 def countKMers(execution):
 
+    if execution.kmerCache:
+        return countKMersCached(execution)
+
     if not os.path.exists(execution.inclusionOutputDirectory):
         os.makedirs(execution.inclusionOutputDirectory)
 
@@ -186,6 +197,41 @@ def countKMers(execution):
 """
 # =============================================================================
 
+COUNT K-MERS (CACHED)
+---------------------
+
+
+PURPOSE
+-------
+
+Like countKMers(...), but reads the k-mers from the k-mer cache, counting and
+adding only those genomes that are not already cached.
+
+
+RETURN
+------
+
+[((FILE LOCATION) ITERATOR, (FILE LOCATION) ITERATOR) TUPLE]
+[(inclusionKMerLocations, exclusionKMerLocations)]
+    The cache locations of the inclusion and exclusion k-mers.
+
+# =============================================================================
+"""
+def countKMersCached(execution):
+
+    locations = KMerCache.populate(
+        execution.jobManager, execution.kmerCache,
+        execution.k, execution.organization,
+        execution.inclusionLocations + execution.exclusionLocations)
+
+    split = len(execution.inclusionLocations)
+
+    return (locations[:split], locations[split:])
+
+
+"""
+# =============================================================================
+
 AGGREGATE K-MERS
 ----------------
 
@@ -230,7 +276,9 @@ def aggregateKMers(execution, inclusionKMerLocations, exclusionKMerLocations):
         aggregateSingleFiles(
             execution, inclusionKMerLocations, exclusionKMerLocations)
 
-    shutil.rmtree(execution.kmersOutputDirectory)
+    # Cached k-mers are kept for reuse; only per-execution k-mers are removed.
+    if os.path.exists(execution.kmersOutputDirectory):
+        shutil.rmtree(execution.kmersOutputDirectory)
 
 
 """
@@ -286,7 +334,7 @@ def aggregateMultipleFiles(execution, inclusionLocations, exclusionLocations):
 
         job = execution.jobManager.createAggregateJob(
             inclusionLocations, exclusionLocations,
-            outputLocation, tag)
+            outputLocation, tag, delete=not execution.kmerCache)
         jobs.append(job)
 
     execution.jobManager.runJobs(jobs)
@@ -350,7 +398,7 @@ def aggregateSingleFiles(
 
     job = execution.jobManager.createAggregateJob(
         inclusionKMerLocations, exclusionKMerLocations,
-        execution.aggregateLocation, None)
+        execution.aggregateLocation, None, delete=not execution.kmerCache)
 
     execution.jobManager.runJobs([job])
 
@@ -679,10 +727,17 @@ MAIN
 """
 def main():
 
+    # --- SUBCOMMAND: neptune cache ... --- #
+    if len(sys.argv) > 1 and sys.argv[1] == CACHE_COMMAND:
+        print("Neptune v" + str(__version__) + "\n")
+        KMerCache.main(sys.argv[2:], __version__)
+        return
+
     # --- PARSER --- #
     parser = argparse.ArgumentParser(
         description=PROGRAM_DESCRIPTION,
-        usage=PROGRAM_USAGE)
+        usage=PROGRAM_USAGE,
+        epilog=PROGRAM_EPILOG)
 
     # --- VERSION --- #
     parser.add_argument(
@@ -730,6 +785,12 @@ def main():
         dest=CountKMers.ORGANIZATION,
         help=CountKMers.ORGANIZATION_HELP,
         type=int, default=3)
+
+    kmers.add_argument(
+        KMerCache.CACHE_LONG,
+        dest=KMerCache.CACHE,
+        help=KMerCache.CACHE_HELP,
+        type=str, required=False)
 
     # --- FILTERING --- #
     filtering = parser.add_argument_group("FILTERING")

@@ -243,7 +243,7 @@ class JobManager:
     @abc.abstractmethod
     def createAggregateJob(
             self, inclusionLocations, exclusionLocations,
-            outputLocation, tag):
+            outputLocation, tag, delete=True):
         return
 
     """

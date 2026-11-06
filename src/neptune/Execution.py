@@ -33,6 +33,7 @@ from scipy.special import comb
 
 import neptune.Neptune as Neptune
 import neptune.CountKMers as CountKMers
+import neptune.KMerCache as KMerCache
 import neptune.ExtractSignatures as ExtractSignatures
 import neptune.FilterSignatures as FilterSignatures
 import neptune.ConsolidateSignatures as ConsolidateSignatures
@@ -244,6 +245,16 @@ class Execution():
             os.path.join(self.kmersOutputDirectory, Neptune.INCLUSION))
         self.exclusionOutputDirectory = os.path.abspath(
             os.path.join(self.kmersOutputDirectory, Neptune.EXCLUSION))
+
+        # -- k-mer cache --
+        self.kmerCache = None
+        if parameters.get(KMerCache.CACHE) is not None:
+            self.kmerCache = os.path.abspath(parameters.get(KMerCache.CACHE))
+
+            if parameters.get(CountKMers.KMER) is None:
+                print("WARNING: A k-mer cache is used without specifying the "
+                      "k-mer size. The estimated k (" + str(self.k) + ") may "
+                      "differ between executions, preventing cache reuse.\n")
 
         self.aggregateLocation = os.path.abspath(
             os.path.join(self.outputDirectoryLocation, Neptune.AGGREGATE))
@@ -568,6 +579,10 @@ class Execution():
         receiptFile.write(
             "k-mer Organization = "
             + str(self.organization) + "\n")
+
+        receiptFile.write(
+            "k-mer Cache = "
+            + str(self.kmerCache) + "\n")
 
         receiptFile.write(
             "Reference Size = "
